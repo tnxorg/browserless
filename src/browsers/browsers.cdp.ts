@@ -194,6 +194,20 @@ export class ChromiumCDP extends EventEmitter {
       extensionLaunchArgs ? extensionLaunchArgs.split('=')[1] : null,
     ].filter((_) => !!_);
 
+    // Add proxy configuration if it exists in options
+    if (options.proxy && options.proxy.server) {
+      const proxyArg = `--proxy-server=${options.proxy.server}`;
+
+      // Add proxy argument to args if not already present
+      if (!options.args) {
+        options.args = [proxyArg];
+      } else if (
+        !options.args.some((arg) => arg.startsWith('--proxy-server'))
+      ) {
+        options.args.push(proxyArg);
+      }
+    }
+
     // Bypass the host we bind to so things like /function can work with proxies
     if (options.args?.some((arg) => arg.includes('--proxy-server'))) {
       const defaultBypassList = [
@@ -214,6 +228,11 @@ export class ChromiumCDP extends EventEmitter {
       }
     }
 
+    // Save viewport settings for use in page creation
+    const defaultViewport = (options as any).defaultViewport;
+
+    // For Puppeteer launch, use defaultViewport: null to prevent automatic viewport setting
+    // We'll set the viewport manually after each page is created
     const finalOptions = {
       ...options,
       args: [
@@ -241,6 +260,69 @@ export class ChromiumCDP extends EventEmitter {
       `Launching ${this.constructor.name} Handler`,
     );
     this.browser = (await launch(finalOptions)) as Browser;
+
+    // Handle proxy authentication if credentials are provided
+    if (options.proxy?.username && options.proxy?.password) {
+      // Authenticate all initial pages
+      const pages = await this.browser.pages();
+      for (const page of pages) {
+        await page.authenticate({
+          username: options.proxy.username,
+          password: options.proxy.password,
+        });
+      }
+
+      // Set up authentication for future pages
+      const authHandler = async (target: Target) => {
+        if (target.type() === 'page') {
+          const page = await target.page().catch((err) => {
+            this.logger.error(`Error getting page for auth: ${err}`);
+            return null;
+          });
+          if (page && options.proxy?.username && options.proxy?.password) {
+            await page.authenticate({
+              username: options.proxy?.username as string,
+              password: options.proxy?.password as string,
+            });
+          }
+        }
+      };
+
+      // Apply auth handler before the regular target created handler
+      this.browser.on('targetcreated', authHandler);
+    }
+
+    // Apply viewport settings to existing pages if viewport was specified
+    if (defaultViewport) {
+      const pages = await this.browser.pages();
+      for (const page of pages) {
+        await page.setViewport(defaultViewport);
+      }
+
+      // Create a handler for setting viewport on new pages
+      const viewportHandler = async (target: Target) => {
+        if (target.type() === 'page') {
+          const page = await target.page().catch((err) => {
+            this.logger.error(
+              `Error getting page for viewport setting: ${err}`,
+            );
+            return null;
+          });
+          if (page) {
+            this.logger.trace(
+              `Setting viewport for new page: ${JSON.stringify(
+                defaultViewport,
+              )}`,
+            );
+            await page.setViewport(defaultViewport);
+          }
+        }
+      };
+
+      // Add viewport handler before the main target handler
+      this.browser.on('targetcreated', viewportHandler);
+    }
+
     this.browser.on('targetcreated', this.onTargetCreated.bind(this));
     this.running = true;
     this.browserWSEndpoint = this.browser.wsEndpoint();
