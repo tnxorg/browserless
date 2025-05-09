@@ -16,3 +16,16 @@ jobs:
 
       - name: Test the Chromium image
         run: docker run --ipc=host -e CI=true --entrypoint ./scripts/test.sh ghcr.io/browserless/chromium:latest
+
+      - name: Log in to DigitalOcean Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.VULTR_REGISTRY_USERNAME }}
+          password: ${{ secrets.VULTR_REGISTRY_PASSWORD }}
+
+      - name: Tag Chromium image for DigitalOcean
+        run: docker tag ghcr.io/browserless/chromium:latest registry.digitalocean.com/tnx-img/browserless-chromium:latest
+
+      - name: Push to DigitalOcean Container Registry
+        run: docker push registry.digitalocean.com/tnx-img/browserless-chromium:latest
