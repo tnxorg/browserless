@@ -55,6 +55,7 @@
     "get-port": "^7.1.0",
     "gradient-string": "^3.0.0",
     "http-proxy": "^1.18.1",
+    "joi": "^17.13.3",
     "lighthouse": "^12.6.0",
     "micromatch": "^4.0.8",
     "playwright-1.48": "npm:playwright-core@1.48.2",
@@ -65,6 +66,7 @@
     "puppeteer-core": "24.8.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-real-browser": "^1.4.2",
     "queue": "^7.0.0",
     "systeminformation": "^5.25.11",
     "tar-fs": "^3.0.8"

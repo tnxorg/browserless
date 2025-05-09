@@ -21,6 +21,8 @@ import path from 'path';
 import playwright from 'playwright-core';
 import puppeteerStealth from 'puppeteer-extra';
 
+import { connect } from 'puppeteer-real-browser';
+
 puppeteerStealth.use(StealthPlugin());
 
 export class ChromiumCDP extends EventEmitter {
@@ -78,6 +80,11 @@ export class ChromiumCDP extends EventEmitter {
       });
 
       if (page) {
+        // Remove Playwright binding
+        await page.evaluateOnNewDocument(() => {
+          delete (window as any).__playwright__binding__;
+        });
+
         this.logger.trace(`Setting up file:// protocol request rejection`);
 
         page.on('error', (err) => {
@@ -235,6 +242,7 @@ export class ChromiumCDP extends EventEmitter {
     // We'll set the viewport manually after each page is created
     const finalOptions = {
       ...options,
+      defaultViewport: null,
       args: [
         `--remote-debugging-port=${this.port}`,
         `--no-sandbox`,
@@ -258,8 +266,53 @@ export class ChromiumCDP extends EventEmitter {
     this.logger.info(
       finalOptions,
       `Launching ${this.constructor.name} Handler`,
+      `And using stealth: ${stealth}`,
     );
-    this.browser = (await launch(finalOptions)) as Browser;
+    if (stealth) {
+      // this.browser = (await launch(finalOptions)) as Browser;
+      const { browser } = await connect({
+        headless: options.headless,
+
+        args: finalOptions.args,
+
+        customConfig: {
+          // chromePath: finalOptions.executablePath,
+          port: this.port,
+          userDataDir: this.userDataDir ?? false,
+          startingUrl: 'https://google.com',
+        },
+
+        turnstile: true,
+
+        connectOption: {},
+
+        disableXvfb: false,
+        ignoreAllFlags: false,
+        // proxy:{
+        //     host:'<proxy-host>',
+        //     port:'<proxy-port>',
+        //     username:'<proxy-username>',
+        //     password:'<proxy-password>'
+        // }
+      });
+
+      this.browser = browser as any as Browser;
+
+      // Remove Playwright binding from all pages
+      const pages = await this.browser.pages();
+      for (const page of pages) {
+        // close blank page
+        if (page.url() === 'about:blank') {
+          await page.goto('https://www.google.com');
+        } else {
+          await page.evaluateOnNewDocument(() => {
+            delete (window as any).__playwright__binding__;
+          });
+        }
+      }
+    } else {
+      this.browser = (await launch(finalOptions)) as Browser;
+    }
 
     // Handle proxy authentication if credentials are provided
     if (options.proxy?.username && options.proxy?.password) {
