@@ -282,7 +282,7 @@ export class ChromiumCDP extends EventEmitter {
           startingUrl: 'https://google.com',
         },
 
-        turnstile: true,
+        turnstile: options.turnstile ?? true,
 
         connectOption: {},
 
