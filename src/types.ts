@@ -378,6 +378,7 @@ export interface BrowserServerOptions {
   };
   timeout?: number;
   tracesDir?: string;
+  turnstile?: boolean;
 }
 
 export interface BrowserlessSession {
