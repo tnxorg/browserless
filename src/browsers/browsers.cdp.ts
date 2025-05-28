@@ -279,7 +279,7 @@ export class ChromiumCDP extends EventEmitter {
           // chromePath: finalOptions.executablePath,
           port: this.port,
           userDataDir: this.userDataDir ?? false,
-          startingUrl: 'https://google.com',
+          startingUrl: options.startUrl ?? 'https://google.com',
         },
 
         turnstile: options.turnstile ?? true,
